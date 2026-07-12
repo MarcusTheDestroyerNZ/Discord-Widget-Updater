@@ -42,8 +42,8 @@ export async function getCleanSteamData(steamId: string): Promise<SteamData> {
   const sortedByTime = [...allGames].sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0));
   
   const recentGameRaw = sortedByRecent[0];
-  const prevGameRaw = sortedByRecent[1];
   const topPlayedRaw = sortedByTime[0];
+  const isCurrentlyPlaying = player.gameid === String(recentGameRaw?.appid);
 
   const totalMinutes = allGames.reduce((acc: number, g: any) => acc + (g.playtime_forever || 0), 0);
 
@@ -109,7 +109,9 @@ export async function getCleanSteamData(steamId: string): Promise<SteamData> {
       hours: Math.round((recentGameRaw?.playtime_forever || 0) / 60),
       unlockedAchievements: recentStats.unlocked,
       totalAchievements: recentStats.total,
-      iconUrl: `https://cdn.akamai.steamstatic.com/steam/apps/${recentGameRaw?.appid || 0}/library_600x900_2x.jpg` 
+      iconUrl: `https://cdn.akamai.steamstatic.com/steam/apps/${recentGameRaw?.appid || 0}/library_600x900_2x.jpg`,
+      lastPlayedTimestamp: recentGameRaw?.rtime_last_played || 0,
+      isCurrentlyPlaying: isCurrentlyPlaying
     }
   };
 }
