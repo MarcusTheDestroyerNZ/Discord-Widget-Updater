@@ -31,13 +31,12 @@ export const builders = {
   recentGameTracker: (data: SteamData) => ({
     data: {
       dynamic: [
-        { type: 3, name: "game image", value: { url: `https://cdn.akamai.steamstatic.com/steam/apps/${data.recentGame.id}/header.jpg` } },
-        { type: 1, name: "title", value: `Recently Played: ${data.recentGame.name.toUpperCase()}` },
+        { type: 3, name: "game image", value: { url: data.recentGame.iconUrl} },
+        { type: 1, name: "title", value: `Last Played: ${data.recentGame.name.toUpperCase()}` },
         { type: 1, name: "progress name", value: "Achievements" },
         { type: 1, name: "progress description", value: `Playtime: ${data.recentGame.hours.toFixed(1)} hours` },
         { type: 2, name: "progress", value: data.recentGame.unlockedAchievements },
         { type: 2, name: "max progress", value: data.recentGame.totalAchievements }
       ]
     }
-  })
-};
+})}

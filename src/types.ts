@@ -1,6 +1,7 @@
 export interface SteamData {
   username: string;
   avatarUrl: string;
+
   // Global Stats (for Profile Tracker)
   totalPlaytimeHours: number;
   totalUnlockedAchievements: number;
@@ -14,8 +15,8 @@ export interface SteamData {
     id: number; 
     name: string; 
     hours: number;
-    unlockedAchievements: number; // Just for this game
-    totalAchievements: number;    // Just for this game
+    unlockedAchievements: number;
+    totalAchievements: number;
+    iconUrl: string;
   };
-  prevGame: { id: number; name: string };
 }

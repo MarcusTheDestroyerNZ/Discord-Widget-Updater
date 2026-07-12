@@ -108,11 +108,8 @@ export async function getCleanSteamData(steamId: string): Promise<SteamData> {
       name: recentGameRaw?.name || "None",
       hours: Math.round((recentGameRaw?.playtime_forever || 0) / 60),
       unlockedAchievements: recentStats.unlocked,
-      totalAchievements: recentStats.total
-    },
-    prevGame: {
-      id: prevGameRaw?.appid || 0,
-      name: prevGameRaw?.name || "None"
+      totalAchievements: recentStats.total,
+      iconUrl: `https://cdn.akamai.steamstatic.com/steam/apps/${recentGameRaw?.appid || 0}/library_600x900_2x.jpg` 
     }
   };
 }
