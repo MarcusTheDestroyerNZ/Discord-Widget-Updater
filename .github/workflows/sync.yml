@@ -1,0 +1,33 @@
+name: Steam Widget Sync
+on:
+  schedule:
+    - cron: '*/5 * * * *' # Runs every 5 minutes
+  workflow_dispatch:      # Allows you to run it manually with a button
+
+jobs:
+  build_and_sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Sync
+        run: npm run sync
+        env:
+          STEAM_WEB_API_KEY: ${{ secrets.STEAM_WEB_API_KEY }}
+          STEAM_ID: ${{ secrets.STEAM_ID }}
+          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
+          DISCORD_TOKEN_1: ${{ secrets.DISCORD_TOKEN_1 }}
+          DISCORD_APP_ID_1: ${{ secrets.DISCORD_APP_ID_1 }}
+          DISCORD_IDENTITY_1: ${{ secrets.DISCORD_IDENTITY_1 }}
+          DISCORD_TOKEN_2: ${{ secrets.DISCORD_TOKEN_2 }}
+          DISCORD_APP_ID_2: ${{ secrets.DISCORD_APP_ID_2 }}
+          DISCORD_IDENTITY_2: ${{ secrets.DISCORD_IDENTITY_2 }}
