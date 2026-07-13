@@ -1,18 +1,13 @@
 import { SteamData } from "./types.js";
 
-function formatHours(hours: number): string {
-    if (hours >= 100) return `${hours.toFixed(0)}h`;
-    return `${hours.toFixed(1)}h`;
-}
-
 function getRelativeTimeString(data: SteamData): string {
   if (data.recentGame.isCurrentlyPlaying) {
-    return "Still Playing";
+    return "During last update";
   }
 
   const secondsAgo = Math.floor(Date.now() / 1000) - data.recentGame.lastPlayedTimestamp;
   
-  if (secondsAgo < 60) return "Just now";
+  if (secondsAgo < 60) return "Less than a minute ago";
   
   const minutes = Math.floor(secondsAgo / 60);
   if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
@@ -27,25 +22,40 @@ function getRelativeTimeString(data: SteamData): string {
   return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
 }
 
+function getNZTimestamp(): string {
+  return new Date().toLocaleString("en-NZ", {
+    timeZone: "Pacific/Auckland",
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZoneName: "short",
+  });
+}
+
+function formatNumber(num: number): string {
+  return num.toLocaleString("en-NZ", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
 export const builders = {
   profileTracker: (data: SteamData) => ({
     username: data.username,
     data: {
       dynamic: [
-        { type: 3, name: "UserProfileImage", value: { url: data.avatarUrl } },
-        { type: 1, name: "WidgetTitle", value: `${data.username}'s Profile` },
-        { type: 1, name: "StatOneLabel", value: "Total Playtime" },
-        { type: 1, name: "StatOneValue", value: `${data.totalPlaytimeHours.toFixed(1)} hours` },
-        { type: 1, name: "StatTwoLabel", value: "Achievements Unlocked" },
-        { type: 1, name: "StatTwoValue", value: `${data.totalUnlockedAchievements}` },
-        { type: 1, name: "StatThreeLabel", value: "100% Completed Games" },
-        { type: 1, name: "StatThreeValue", value: `${data.completedGamesCount}` },
-        { type: 1, name: "StatFourLabel", value: "Most Played Game" },
-        { type: 1, name: "StatFourValue", value: `${data.mostPlayedGame.name} (${formatHours(data.mostPlayedGame.hours)})` },
-        { type: 1, name: "StatFiveLabel", value: "Most Recent Game" },
-        { type: 1, name: "StatFiveValue", value: `${data.recentGame.name} (${formatHours(data.recentGame.hours)})` },
-        { type: 1, name: "StatSixLabel", value: "Games 100% This Month" },
-        { type: 1, name: "StatSixValue", value: `${data.completedGamesThisMonth}` },
+        { type: 3, name: "profile image", value: { url: data.avatarUrl } },
+        { type: 1, name: "widget title", value: `${data.username}'s Profile` },
+        { type: 1, name: "playtime", value: `${formatNumber(data.totalPlaytimeHours)} hours` },
+        { type: 1, name: "total achievements", value: `${formatNumber(data.totalUnlockedAchievements)}` },
+        { type: 1, name: "completed games", value: `${formatNumber(data.completedGamesCount)}` },
+        { type: 1, name: "most played game", value: `${data.mostPlayedGame.name} (${formatNumber(data.mostPlayedGame.hours)}h)` },
+        { type: 1, name: "most recent game", value: `${data.recentGame.name} (${formatNumber(data.recentGame.hours)}h)` },
+        { type: 1, name: "monthly completed games", value: `${formatNumber(data.completedGamesThisMonth)}` },
+        { type: 1, name: "last updated timer", value: `Last updated: \n ${getNZTimestamp()}` },
       ]
     }
   }),
@@ -54,12 +64,12 @@ export const builders = {
     data: {
       dynamic: [
         { type: 3, name: "game image", value: { url: data.recentGame.iconUrl} },
-        { type: 1, name: "title", value: `Last Played: ${data.recentGame.name.toUpperCase()}` },
-        { type: 1, name: "title subtext", value: `Last Played: ${getRelativeTimeString(data)}` },
-        { type: 1, name: "progress name", value: "Achievements" },
-        { type: 1, name: "progress description", value: `Playtime: ${data.recentGame.hours.toFixed(1)} hours` },
+        { type: 1, name: "title", value: `LAST PLAYED: ${data.recentGame.name}` },
+        { type: 1, name: "title subtext", value: `${getRelativeTimeString(data)}` },
+        { type: 1, name: "progress description", value: `Playtime: ${formatNumber(data.recentGame.hours)} hours` },
         { type: 2, name: "progress", value: data.recentGame.unlockedAchievements },
-        { type: 2, name: "max progress", value: data.recentGame.totalAchievements }
+        { type: 2, name: "max progress", value: data.recentGame.totalAchievements },
+        { type: 1, name: "last updated timer", value: `Last updated: \n ${getNZTimestamp()}` }
       ]
     }
 })}
