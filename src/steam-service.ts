@@ -12,7 +12,6 @@ async function steamGet(path: string, params: Record<string, string>) {
   return res.json();
 }
 
-// Restored: Concurrency helper to prevent API timeouts/blocks
 async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = [];
   const executing = new Set<Promise<void>>();
@@ -47,7 +46,6 @@ export async function getCleanSteamData(steamId: string): Promise<SteamData> {
 
   const totalMinutes = allGames.reduce((acc: number, g: any) => acc + (g.playtime_forever || 0), 0);
 
-  // --- RESTORED DEEP SCAN LOGIC ---
   const currentMonthStart = new Date();
   currentMonthStart.setUTCDate(1);
   currentMonthStart.setUTCHours(0, 0, 0, 0);

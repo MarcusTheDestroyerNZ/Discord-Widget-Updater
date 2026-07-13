@@ -14,7 +14,7 @@ export interface SteamData {
     unlockedAchievements: number;
     totalAchievements: number;
     iconUrl: string;
-    lastPlayedTimestamp: number; // New
-    isCurrentlyPlaying: boolean; // New
+    lastPlayedTimestamp: number;
+    isCurrentlyPlaying: boolean;
   };
 }
