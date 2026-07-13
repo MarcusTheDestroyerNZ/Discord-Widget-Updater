@@ -25,11 +25,9 @@ function getRelativeTimeString(data: SteamData): string {
 function getNZTimestamp(): string {
   return new Date().toLocaleString("en-NZ", {
     timeZone: "Pacific/Auckland",
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hour12: false,
     timeZoneName: "short",
   });
@@ -55,7 +53,7 @@ export const builders = {
         { type: 1, name: "most played game", value: `${data.mostPlayedGame.name} (${formatNumber(data.mostPlayedGame.hours)}h)` },
         { type: 1, name: "most recent game", value: `${data.recentGame.name} (${formatNumber(data.recentGame.hours)}h)` },
         { type: 1, name: "monthly completed games", value: `${formatNumber(data.completedGamesThisMonth)}` },
-        { type: 1, name: "last updated timer", value: `Updated at:${getNZTimestamp()}` },
+        { type: 1, name: "last updated timer", value: `Updated at: ${getNZTimestamp()}` },
       ]
     }
   }),
@@ -69,7 +67,7 @@ export const builders = {
         { type: 1, name: "progress description", value: `${data.recentGame.totalAchievements === 0 ? 100 : (data.recentGame.unlockedAchievements / data.recentGame.totalAchievements * 100).toFixed(0)}% Complete` },
         { type: 2, name: "progress", value: data.recentGame.unlockedAchievements },
         { type: 2, name: "max progress", value: data.recentGame.totalAchievements },
-        { type: 1, name: "last updated timer", value: `Updated at:${getNZTimestamp()}` }
+        { type: 1, name: "last updated timer", value: `Updated at: ${getNZTimestamp()}` }
       ]
     }
 })}
