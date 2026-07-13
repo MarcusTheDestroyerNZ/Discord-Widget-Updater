@@ -55,7 +55,7 @@ export const builders = {
         { type: 1, name: "most played game", value: `${data.mostPlayedGame.name} (${formatNumber(data.mostPlayedGame.hours)}h)` },
         { type: 1, name: "most recent game", value: `${data.recentGame.name} (${formatNumber(data.recentGame.hours)}h)` },
         { type: 1, name: "monthly completed games", value: `${formatNumber(data.completedGamesThisMonth)}` },
-        { type: 1, name: "last updated timer", value: `Last updated: \n ${getNZTimestamp()}` },
+        { type: 1, name: "last updated timer", value: `Updated at:${getNZTimestamp()}` },
       ]
     }
   }),
@@ -65,11 +65,11 @@ export const builders = {
       dynamic: [
         { type: 3, name: "game image", value: { url: data.recentGame.iconUrl} },
         { type: 1, name: "title", value: `LAST PLAYED: ${data.recentGame.name}` },
-        { type: 1, name: "title subtext", value: `${getRelativeTimeString(data)}` },
-        { type: 1, name: "progress description", value: `Playtime: ${formatNumber(data.recentGame.hours)} hours` },
+        { type: 1, name: "title subtext", value: `Last played: ${getRelativeTimeString(data)}` },
+        { type: 1, name: "progress description", value: `${data.recentGame.totalAchievements === 0 ? 100 : (data.recentGame.unlockedAchievements / data.recentGame.totalAchievements * 100).toFixed(0)}% Complete` },
         { type: 2, name: "progress", value: data.recentGame.unlockedAchievements },
         { type: 2, name: "max progress", value: data.recentGame.totalAchievements },
-        { type: 1, name: "last updated timer", value: `Last updated: \n ${getNZTimestamp()}` }
+        { type: 1, name: "last updated timer", value: `Updated at:${getNZTimestamp()}` }
       ]
     }
 })}
