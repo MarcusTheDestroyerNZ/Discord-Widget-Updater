@@ -1,7 +1,7 @@
 name: Steam Widget Sync
 on:
-  schedule:
-    - cron: '*/6 * * * *' # Runs every 6 minutes
+  repository_dispatch:
+    types: [cron-trigger]
   workflow_dispatch:      # Adds manual trigger with a button
 
 jobs:
