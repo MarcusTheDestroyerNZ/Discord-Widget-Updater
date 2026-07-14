@@ -2,7 +2,7 @@ import { SteamData } from "./types.js";
 
 function getRelativeTimeString(data: SteamData): string {
   if (data.recentGame.isCurrentlyPlaying) {
-    return "During last update";
+    return "Still playing now";
   }
 
   const secondsAgo = Math.floor(Date.now() / 1000) - data.recentGame.lastPlayedTimestamp;
@@ -63,7 +63,7 @@ export const builders = {
       dynamic: [
         { type: 3, name: "game image", value: { url: data.recentGame.iconUrl} },
         { type: 1, name: "title", value: `LAST PLAYED: ${data.recentGame.name}` },
-        { type: 1, name: "title subtext", value: `Last played: ${getRelativeTimeString(data)}` },
+        { type: 1, name: "title subtext", value: `${getRelativeTimeString(data)}` },
         { type: 1, name: "progress description", value: `${data.recentGame.totalAchievements === 0 ? 100 : (data.recentGame.unlockedAchievements / data.recentGame.totalAchievements * 100).toFixed(0)}% Complete` },
         { type: 2, name: "progress", value: data.recentGame.unlockedAchievements },
         { type: 2, name: "max progress", value: data.recentGame.totalAchievements },
