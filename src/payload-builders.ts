@@ -40,7 +40,7 @@ function formatNumber(num: number): string {
   });
 }
 
-const ACHIEVEMENT_SET_DESCRIPTION_LIMIT = 44;
+const ACHIEVEMENT_SET_DESCRIPTION_LIMIT = 47;
 
 function truncateSetName(name: string, maxLength: number): string {
   if (name.length <= maxLength) return name;
@@ -80,7 +80,11 @@ function formatAchievementSetProgress(data: SteamData): string {
     }
   }
 
-  return formattedSets.join(" · ").slice(0, ACHIEVEMENT_SET_DESCRIPTION_LIMIT);
+  const activeAchievementSets = data.recentGame.achievementSets.filter((set) => set.unlocked > 0);
+  const activeUnlockedAchievements = activeAchievementSets.reduce((sum, set) => sum + set.unlocked, 0);
+  const activeTotalAchievements = activeAchievementSets.reduce((sum, set) => sum + set.total, 0);
+
+  return Math.round(activeUnlockedAchievements / activeTotalAchievements * 100) + '% | ' + formattedSets.join(" · ").slice(0, ACHIEVEMENT_SET_DESCRIPTION_LIMIT);
 }
 
 export const builders = {
