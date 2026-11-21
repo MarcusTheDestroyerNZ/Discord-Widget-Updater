@@ -40,6 +40,49 @@ function formatNumber(num: number): string {
   });
 }
 
+const ACHIEVEMENT_SET_DESCRIPTION_LIMIT = 44;
+
+function truncateSetName(name: string, maxLength: number): string {
+  if (name.length <= maxLength) return name;
+  if (maxLength <= 1) return "…";
+  return `${name.slice(0, maxLength - 1)}…`;
+}
+
+function formatAchievementSetProgress(data: SteamData): string {
+  const overall = data.recentGame.totalAchievements === 0
+    ? 100
+    : (data.recentGame.unlockedAchievements / data.recentGame.totalAchievements * 100);
+
+  const sets = data.recentGame.achievementSets.filter((set) => set.unlocked > 0);
+  if (sets.length === 0) return `${overall.toFixed(0)}% · No unlocked set achievements`;
+
+  const formattedSets: string[] = [];
+
+  for (const set of sets) {
+    let name = set.name;
+    if (/^base game$/i.test(name)) name = "Base";
+    if (name.includes(":")) name = name.split(":", 2)[1].trim();
+    name = truncateSetName(name, 12);
+
+    const formatted = `${name} ${set.unlocked}/${set.total}`;
+    const nextText = formattedSets.length === 0
+      ? formatted
+      : `${formattedSets.join(" · ")} · ${formatted}`;
+
+    if (nextText.length <= ACHIEVEMENT_SET_DESCRIPTION_LIMIT) {
+      formattedSets.push(formatted);
+    } else {
+      const remaining = sets.length - formattedSets.length - 1;
+      if (remaining > 0) {
+        formattedSets.push(`+${remaining + 1} sets`);
+      }
+      break;
+    }
+  }
+
+  return formattedSets.join(" · ").slice(0, ACHIEVEMENT_SET_DESCRIPTION_LIMIT);
+}
+
 export const builders = {
   profileTracker: (data: SteamData) => ({
     username: data.username,
@@ -58,16 +101,23 @@ export const builders = {
     }
   }),
 
-  recentGameTracker: (data: SteamData) => ({
-    data: {
-      dynamic: [
-        { type: 3, name: "game image", value: { url: data.recentGame.iconUrl} },
-        { type: 1, name: "title", value: `LAST PLAYED: ${data.recentGame.name}` },
-        { type: 1, name: "title subtext", value: `${getRelativeTimeString(data)}` },
-        { type: 1, name: "progress description", value: `${data.recentGame.totalAchievements === 0 ? 100 : (data.recentGame.unlockedAchievements / data.recentGame.totalAchievements * 100).toFixed(0)}% Complete` },
-        { type: 2, name: "progress", value: data.recentGame.unlockedAchievements },
-        { type: 2, name: "max progress", value: data.recentGame.totalAchievements },
-        { type: 1, name: "last updated timer", value: `Updated at: ${getNZTimestamp()}` }
-      ]
-    }
-})}
+  recentGameTracker: (data: SteamData) => {
+    const activeAchievementSets = data.recentGame.achievementSets.filter((set) => set.unlocked > 0);
+    const activeUnlockedAchievements = activeAchievementSets.reduce((sum, set) => sum + set.unlocked, 0);
+    const activeTotalAchievements = activeAchievementSets.reduce((sum, set) => sum + set.total, 0);
+
+    return {
+      data: {
+        dynamic: [
+          { type: 3, name: "game image", value: { url: data.recentGame.iconUrl} },
+          { type: 1, name: "title", value: `LAST PLAYED: ${data.recentGame.name}` },
+          { type: 1, name: "title subtext", value: `${getRelativeTimeString(data)}` },
+          { type: 1, name: "progress description", value: formatAchievementSetProgress(data) },
+          { type: 2, name: "progress", value: activeUnlockedAchievements },
+          { type: 2, name: "max progress", value: activeTotalAchievements },
+          { type: 1, name: "last updated timer", value: `Updated at: ${getNZTimestamp()}` }
+        ]
+      }
+    };
+  }
+};

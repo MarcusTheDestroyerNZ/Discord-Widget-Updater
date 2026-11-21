@@ -4,12 +4,22 @@ import { SteamData } from "./types.js";
 const STEAM_API_BASE = "https://api.steampowered.com";
 
 // Helper for Steam API calls
-async function steamGet(path: string, params: Record<string, string>) {
+async function steamGet(path: string, params: Record<string, string>): Promise<any | null> {
   const url = new URL(`${STEAM_API_BASE}${path}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetch(url);
   if (!res.ok) return null;
-  return res.json();
+  return await res.json() as any;
+}
+
+async function steamCommunityGet(path: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://steamcommunity.com${path}`);
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
 }
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
@@ -23,6 +33,143 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item
   }
   await Promise.all(executing);
   return results;
+}
+
+async function getSteamCommunityAchievementSets(steamId: string, appId: number, userAchievements: any[]) {
+  const html = await steamCommunityGet(`/profiles/${steamId}/stats/${appId}/?tab=achievements&l=english`);
+  if (!html) return null;
+
+  const normalizedHtml = html.replace(/\\"/g, '"');
+  const marker = `"appid":${appId},"language":"english","groups":`;
+  const markerIndex = normalizedHtml.indexOf(marker);
+  if (markerIndex < 0) return null;
+
+  const arrayStart = normalizedHtml.indexOf('[', markerIndex);
+  if (arrayStart < 0) return null;
+
+  let depth = 0;
+  let arrayEnd = -1;
+  for (let i = arrayStart; i < normalizedHtml.length; i++) {
+    if (normalizedHtml[i] === '[') depth++;
+    if (normalizedHtml[i] === ']') {
+      depth--;
+      if (depth === 0) {
+        arrayEnd = i + 1;
+        break;
+      }
+    }
+  }
+  if (arrayEnd < 0) return null;
+
+  const groupsJson = normalizedHtml.slice(arrayStart, arrayEnd);
+  const names = new Map<string, string>();
+  const namePattern = /"id":(\d+),"name":"([^"]*)"/g;
+  let nameMatch: RegExpExecArray | null;
+  while ((nameMatch = namePattern.exec(groupsJson)) !== null) {
+    names.set(nameMatch[1], nameMatch[2] || (nameMatch[1] === "0" ? "Base Game" : `Set ${nameMatch[1]}`));
+  }
+
+  const totals = new Map<string, number>();
+  const unlockedNames = new Set(
+    userAchievements
+      .filter((achievement: any) => achievement.achieved === 1)
+      .map((achievement: any) => String(achievement.name ?? achievement.apiname))
+  );
+  const unlockedBySet = new Map<string, number>();
+
+  const achievementPattern = /"api_name":"([^"]+)"[\s\S]{0,800}?"groupid":(\d+)/g;
+  let achievementMatch: RegExpExecArray | null;
+  while ((achievementMatch = achievementPattern.exec(groupsJson)) !== null) {
+    const achievementStart = groupsJson.lastIndexOf('{', achievementMatch.index);
+    const achievementEnd = groupsJson.indexOf('}', achievementMatch.index);
+    const achievementJson = groupsJson.slice(achievementStart, achievementEnd + 1);
+    if (/"archived":true/.test(achievementJson)) continue;
+
+    const apiName = achievementMatch[1];
+    const setId = achievementMatch[2];
+    totals.set(setId, (totals.get(setId) || 0) + 1);
+    if (unlockedNames.has(apiName)) {
+      unlockedBySet.set(setId, (unlockedBySet.get(setId) || 0) + 1);
+    }
+  }
+
+  if (totals.size === 0) return null;
+
+  return [...totals.entries()].map(([setId, total]) => {
+    const unlocked = unlockedBySet.get(setId) || 0;
+    return {
+      id: setId,
+      name: names.get(setId) || (setId === "0" ? "Base Game" : `Set ${setId}`),
+      unlocked,
+      total,
+      missing: total - unlocked
+    };
+  });
+}
+
+function getAchievementSetProgress(schemaResponse: any, userAchievements: any[]) {
+  const availableStats = schemaResponse?.game?.availableGameStats || {};
+  const schemaAchievements: any[] = availableStats.achievements || [];
+  const activeAchievements = schemaAchievements.filter((achievement: any) =>
+    achievement.archived !== true && achievement.archived !== 1 && achievement.optionalStatus !== "Archived"
+  );
+
+  const unlockedNames = new Set(
+    userAchievements
+      .filter((achievement: any) => achievement.achieved === 1)
+      .map((achievement: any) => String(achievement.name ?? achievement.apiname))
+  );
+
+  const setKeys = ["achievementsets", "achievement_sets", "achievementSets", "sets", "groups"];
+  const setContainerKey = setKeys.find((key) => Array.isArray(availableStats[key]));
+  const setContainers: any[] = setContainerKey ? availableStats[setContainerKey] : [];
+  const setById = new Map<string, { id: string; name: string }>();
+  const achievementSetByName = new Map<string, { id: string; name: string }>();
+
+  for (const set of setContainers) {
+    const id = String(set.id ?? set.setid ?? set.setId ?? set.groupid ?? set.groupId ?? set.name ?? "base");
+    const name = String(set.name ?? set.setname ?? set.setName ?? set.displayName ?? (id === "base" ? "Base Game" : `Set ${id}`));
+    const setInfo = { id, name };
+    setById.set(id, setInfo);
+
+    const members = set.achievements || set.achievementNames || set.apiNames || set.achievement_ids || [];
+    for (const member of members) {
+      const memberName = typeof member === "string"
+        ? member
+        : String(member.name ?? member.apiName ?? member.api_name ?? member.apiname ?? member.internal_key ?? "");
+      if (memberName) achievementSetByName.set(memberName, setInfo);
+    }
+  }
+
+  const progressBySet = new Map<string, { id: string; name: string; unlocked: number; total: number; missing: number }>();
+
+  for (const achievement of activeAchievements) {
+    const achievementName = String(achievement.name ?? achievement.apiName ?? achievement.api_name ?? "");
+    const explicitSetId = achievement.setid ?? achievement.setId ?? achievement.set_id
+      ?? achievement.achievementSetId ?? achievement.achievement_set_id
+      ?? achievement.groupid ?? achievement.groupId ?? achievement.group;
+
+    let setInfo = achievementSetByName.get(achievementName);
+
+    if (!setInfo && explicitSetId != null) {
+      const id = String(explicitSetId);
+      setInfo = setById.get(id) ?? { id, name: `Set ${id}` };
+    }
+
+    if (!setInfo) {
+      setInfo = setById.get("base") ?? { id: "base", name: setContainers.length > 0 ? "Base Game" : "Achievements" };
+    }
+
+    const progress = progressBySet.get(setInfo.id) ?? { ...setInfo, unlocked: 0, total: 0, missing: 0 };
+    progress.total++;
+    if (unlockedNames.has(achievementName)) progress.unlocked++;
+    progressBySet.set(setInfo.id, progress);
+  }
+
+  return [...progressBySet.values()].map((set) => ({
+    ...set,
+    missing: set.total - set.unlocked
+  }));
 }
 
 export async function getCleanSteamData(steamId: string): Promise<SteamData> {
@@ -52,20 +199,29 @@ export async function getCleanSteamData(steamId: string): Promise<SteamData> {
 
   const playedGames = allGames.filter((g: any) => g.playtime_forever > 0);
   
-  const gameStats = await mapWithConcurrency(playedGames, 4, async (game) => {
+  const gameStats = await mapWithConcurrency(playedGames, 4, async (game: any) => {
     try {
       // Get both User achievements and the Game's official schema
-      const [achRes, schemaRes] = await Promise.all([
-        steamGet("/ISteamUserStats/GetPlayerAchievements/v1/", { key: apiKey, steamid: steamId, appid: game.appid }),
-        steamGet("/ISteamUserStats/GetSchemaForGame/v2/", { key: apiKey, appid: game.appid })
+      const [achResRaw, schemaResRaw] = await Promise.all([
+        steamGet("/ISteamUserStats/GetPlayerAchievements/v1/", { key: apiKey, steamid: steamId, appid: String(game.appid) }),
+        steamGet("/ISteamUserStats/GetSchemaForGame/v2/", { key: apiKey, appid: String(game.appid) })
       ]);
+      const achRes = achResRaw as any;
+      const schemaRes = schemaResRaw as any;
 
       const userAchievements = achRes?.playerstats?.achievements || [];
-      const schemaAchievements = schemaRes?.game?.availableGameStats?.achievements || [];
+      const allSchemaAchievements = schemaRes?.game?.availableGameStats?.achievements || [];
+      const schemaAchievements = allSchemaAchievements.filter((achievement: any) =>
+        achievement.archived !== true && achievement.archived !== 1 && achievement.optionalStatus !== "Archived"
+      );
 
       if (schemaAchievements.length === 0) return null;
 
-      const unlocked = userAchievements.filter((a: any) => a.achieved === 1);
+      const unlocked = userAchievements.filter((achievement: any) =>
+        achievement.achieved === 1 && schemaAchievements.some((schemaAchievement: any) =>
+          String(schemaAchievement.name) === String(achievement.name ?? achievement.apiname)
+        )
+      );
       const isCompleted = unlocked.length === schemaAchievements.length;
       
       let isCompletedThisMonth = false;
@@ -78,6 +234,8 @@ export async function getCleanSteamData(steamId: string): Promise<SteamData> {
         appid: game.appid,
         unlocked: unlocked.length,
         total: schemaAchievements.length,
+        achievementSets: getAchievementSetProgress(schemaRes, userAchievements),
+        userAchievements,
         isCompleted,
         isCompletedThisMonth
       };
@@ -87,7 +245,19 @@ export async function getCleanSteamData(steamId: string): Promise<SteamData> {
   const validStats = gameStats.filter((s): s is NonNullable<typeof s> => s !== null);
 
   // Find stats for the most recent game specifically
-  const recentStats = validStats.find(s => s.appid === recentGameRaw?.appid) || { unlocked: 0, total: 0 };
+  const recentStats = validStats.find(s => s.appid === recentGameRaw?.appid) || {
+    unlocked: 0,
+    total: 0,
+    achievementSets: [],
+    userAchievements: []
+  };
+
+  const communityAchievementSets = await getSteamCommunityAchievementSets(
+    steamId,
+    recentGameRaw?.appid || 0,
+    (recentStats as any).userAchievements || []
+  );
+  const recentAchievementSets = communityAchievementSets || recentStats.achievementSets;
 
   return {
     username: player.personaname,
@@ -108,6 +278,7 @@ export async function getCleanSteamData(steamId: string): Promise<SteamData> {
       unlockedAchievements: recentStats.unlocked,
       totalAchievements: recentStats.total,
       iconUrl: `https://cdn.akamai.steamstatic.com/steam/apps/${recentGameRaw?.appid || 0}/library_600x900_2x.jpg`,
+      achievementSets: recentAchievementSets,
       lastPlayedTimestamp: recentGameRaw?.rtime_last_played || 0,
       isCurrentlyPlaying: isCurrentlyPlaying
     }
