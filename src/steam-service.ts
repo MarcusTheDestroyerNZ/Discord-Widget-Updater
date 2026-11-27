@@ -22,6 +22,44 @@ async function steamCommunityGet(path: string): Promise<string | null> {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function getRecentGameImageUrl(appId: number): Promise<string> {
+  const libraryImageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`;
+
+  try {
+    const response = await fetch(libraryImageUrl, { method: "HEAD" });
+    if (response.ok && response.headers.get("content-type")?.startsWith("image/")) {
+      return libraryImageUrl;
+    }
+  } catch (error) {
+    console.warn(`Unable to check Steam library artwork for app ${appId}.`, error);
+  }
+
+  try {
+    const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}`);
+    if (!response.ok) throw new Error(`Steam Store returned ${response.status}`);
+
+    const details: unknown = await response.json();
+    if (isRecord(details)) {
+      const appDetails = details[String(appId)];
+      if (isRecord(appDetails) && isRecord(appDetails.data)) {
+        const headerImageUrl = appDetails.data.header_image;
+        if (typeof headerImageUrl === "string" && headerImageUrl.length > 0) {
+          return headerImageUrl;
+        }
+      }
+    }
+    throw new Error(`Steam Store did not provide header artwork for app ${appId}`);
+  } catch (error) {
+    console.warn(`Unable to load Steam Store artwork for app ${appId}.`, error);
+  }
+
+  return libraryImageUrl;
+}
+
 async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = [];
   const executing = new Set<Promise<void>>();
@@ -277,7 +315,7 @@ export async function getCleanSteamData(steamId: string): Promise<SteamData> {
       hours: Math.round((recentGameRaw?.playtime_forever || 0) / 60),
       unlockedAchievements: recentStats.unlocked,
       totalAchievements: recentStats.total,
-      iconUrl: `https://cdn.akamai.steamstatic.com/steam/apps/${recentGameRaw?.appid || 0}/library_600x900_2x.jpg`,
+      iconUrl: await getRecentGameImageUrl(recentGameRaw?.appid || 0),
       achievementSets: recentAchievementSets,
       lastPlayedTimestamp: recentGameRaw?.rtime_last_played || 0,
       isCurrentlyPlaying: isCurrentlyPlaying
